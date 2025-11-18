@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://spraytechtips.github.io/sitemap.xml
