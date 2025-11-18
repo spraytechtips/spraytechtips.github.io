@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Car Guessing Game</title>
     <link rel="stylesheet" href="style.css">
 </head>
@@ -10,26 +11,20 @@
         <header>
             <h1>Guess the Car!</h1>
             <p>Try to guess the make and model of the car shown in the image within 6 attempts.</p>
-            <p>THE IMAGE WILL REVEAL ITSELF MORE EVERY TIME YOU GET IT WRONG</p>
         </header>
         <main>
+            <div id="strikeCounter" class="strike-counter"></div>
             <div id="imageWrapper" class="image-wrapper">
-                <img src="" alt="Guess this car" id="carImage" width="500" height="300">
-                <!-- Overlays to hide parts of the image, which will be removed on incorrect guesses -->
-                <div class="overlay" id="overlay1"></div>
-                <div class="overlay" id="overlay2"></div>
-                <div class="overlay" id="overlay3"></div>
-                <div class="overlay" id="overlay4"></div>
-                <div class="overlay" id="overlay5"></div>
-                <div class="overlay" id="overlay6"></div>
+                <img src="" alt="Guess this car" id="carImage" class="car-image">
             </div>
-            <input type="text" id="userGuess" placeholder="Enter make and model" class="user-input">
+            <input type="text" id="userGuess" placeholder="Enter brand and model (e.g., Toyota Camry)" class="user-input">
             <button id="guessButton" class="btn">Guess</button>
             <div id="feedback" class="feedback"></div>
+            <div id="guessHistory" class="guess-history"></div>
             <button id="nextButton" class="btn" style="display:none;">Next Car</button>
         </main>
         <footer>
-            <p>Created by @afk_spray on Instagram.</p>
+            <p>Created by <a href="https://www.instagram.com/spraybottle123/" target="_blank">@spraybottle123</a> on Instagram.</p>
         </footer>
     </div>
     <script src="script.js"></script>

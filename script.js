@@ -68,14 +68,86 @@ document.addEventListener('DOMContentLoaded', async function () {
         // This pattern continues until the desired number of entries is reached
     ];
     let currentCar = '';
+    let currentBrand = '';
+    let currentModel = '';
     let guessesLeft = 6;
     let currentGuess = 0;
+    let guessHistory = []; // Track previous guesses
+    
+    // Zoom levels: start very zoomed in and gradually zoom out to normal (1x)
+    // 6 wrong guesses will reveal the image progressively
+    const zoomLevels = [6, 5, 4, 3, 2, 1.5, 1];
 
     const userGuess = document.getElementById('userGuess');
     const guessButton = document.getElementById('guessButton');
     const feedback = document.getElementById('feedback');
     const nextButton = document.getElementById('nextButton');
-    const overlays = document.querySelectorAll('.overlay'); // Assuming you have 6 overlay divs to cover the car image
+    const carImageElement = document.getElementById('carImage');
+    const strikeCounter = document.getElementById('strikeCounter');
+    const guessHistoryElement = document.getElementById('guessHistory');
+
+    // Function to parse car name into brand and model
+    function parseCarName(carName) {
+        const parts = carName.split(' ');
+        // Handle multi-word brands like "Land Rover", "Alfa Romeo", "Aston Martin", etc.
+        const multiWordBrands = ['Land Rover', 'Alfa Romeo', 'Aston Martin', 'Mercedes-Benz', 'Mini Cooper', 'Rolls-Royce'];
+        
+        let brand = '';
+        let model = '';
+        
+        for (const multiWordBrand of multiWordBrands) {
+            // Case-insensitive comparison
+            if (carName.toLowerCase().startsWith(multiWordBrand.toLowerCase())) {
+                brand = multiWordBrand;
+                model = carName.substring(multiWordBrand.length).trim();
+                return { brand, model };
+            }
+        }
+        
+        // Default: first word is brand, rest is model
+        brand = parts[0];
+        model = parts.slice(1).join(' ');
+        
+        return { brand, model };
+    }
+
+    // Function to update strike counter
+    function updateStrikeCounter() {
+        let counterHTML = '';
+        for (let i = 0; i < 6; i++) {
+            if (i < guessHistory.length) {
+                const guess = guessHistory[i];
+                if (guess.result === 'correct') {
+                    counterHTML += '<span class="strike-box correct">✓</span>';
+                } else if (guess.result === 'partial') {
+                    counterHTML += '<span class="strike-box partial">⚠</span>';
+                } else {
+                    counterHTML += '<span class="strike-box wrong">✗</span>';
+                }
+            } else {
+                counterHTML += '<span class="strike-box empty">□</span>';
+            }
+        }
+        strikeCounter.innerHTML = counterHTML;
+    }
+
+    // Function to update guess history display
+    function updateGuessHistory() {
+        let historyHTML = '';
+        guessHistory.forEach((guess, index) => {
+            const brandClass = guess.brandCorrect ? 'correct-part' : 'wrong-part';
+            const modelClass = guess.modelCorrect ? 'correct-part' : 'wrong-part';
+            
+            historyHTML += `
+                <div class="guess-item">
+                    <span class="guess-number">#${index + 1}</span>
+                    <span class="${brandClass}">${guess.brand}</span>
+                    <span class="${modelClass}">${guess.model}</span>
+                </div>
+            `;
+        });
+        guessHistoryElement.innerHTML = historyHTML;
+    }
 
     // Function to fetch images from Wikimedia Commons
     async function fetchCarImage(searchTerm) {
@@ -95,18 +167,17 @@ document.addEventListener('DOMContentLoaded', async function () {
     // Function to initialize the game with a new car image
     async function newGame() {
         currentCar = searchTerms[Math.floor(Math.random() * searchTerms.length)]; // Pick a random search term
+        const parsed = parseCarName(currentCar);
+        currentBrand = parsed.brand;
+        currentModel = parsed.model;
+        
         const imageUrl = await fetchCarImage(currentCar);
-        const carImageElement = document.getElementById('carImage');
-
-        const overlays = document.querySelectorAll('.overlay');
-        overlays.forEach(overlay => {
-            overlay.classList.remove('hidden'); // Remove the 'hidden' class to make overlays visible again
-            overlay.style.display = 'block'; // Ensure display is set back to 'block'
-        });
 
         if (imageUrl) {
             carImageElement.src = imageUrl;
-            feedback.textContent = 'Guess the car!';
+            carImageElement.style.transform = `scale(${zoomLevels[0]})`; // Start with maximum zoom
+            carImageElement.classList.remove('fill-container'); // Remove fill class for gameplay
+            feedback.textContent = 'Guess the car brand and model!';
         } else {
             feedback.textContent = 'Failed to load car image. Please try again.';
         }
@@ -117,38 +188,82 @@ document.addEventListener('DOMContentLoaded', async function () {
         nextButton.style.display = 'none';
         currentGuess = 0;
         guessesLeft = 6;
-        overlays.forEach(overlay => overlay.style.display = 'block'); // Reset overlays to cover the image
+        guessHistory = [];
+        updateStrikeCounter();
+        updateGuessHistory();
     }
 
-    // Function to reveal more of the car image
-    function revealMoreOfCar() {
-        if (currentGuess < overlays.length) {
-            overlays[currentGuess].classList.add('hidden');
-            currentGuess++;
+    // Prevent right-click on image
+    carImageElement.addEventListener('contextmenu', function(e) {
+        e.preventDefault();
+        return false;
+    });
+
+    // Function to zoom out the car image
+    function zoomOutImage() {
+        currentGuess++;
+        if (currentGuess < zoomLevels.length) {
+            carImageElement.style.transform = `scale(${zoomLevels[currentGuess]})`;
         }
     }
 
     // Event listener for the guess button
     guessButton.addEventListener('click', function () {
-        if (userGuess.value.toLowerCase() === currentCar.toLowerCase()) {
-            feedback.textContent = 'Correct! Well done.';
+        const userInput = userGuess.value.trim();
+        if (!userInput) return;
+        
+        const userParsed = parseCarName(userInput);
+        const userBrand = userParsed.brand.toLowerCase();
+        const userModel = userParsed.model.toLowerCase();
+        
+        const brandCorrect = userBrand === currentBrand.toLowerCase();
+        const modelCorrect = userModel === currentModel.toLowerCase();
+        const fullyCorrect = brandCorrect && modelCorrect;
+        
+        // Record the guess
+        const guessResult = {
+            brand: userParsed.brand,
+            model: userParsed.model,
+            brandCorrect: brandCorrect,
+            modelCorrect: modelCorrect,
+            result: fullyCorrect ? 'correct' : (brandCorrect || modelCorrect) ? 'partial' : 'wrong'
+        };
+        guessHistory.push(guessResult);
+        
+        if (fullyCorrect) {
+            feedback.textContent = '🎉 Correct! Well done!';
             userGuess.disabled = true;
             guessButton.disabled = true;
             nextButton.style.display = 'block';
-            overlays.forEach(overlay => overlay.style.display = 'none'); // Reveal the whole image
+            carImageElement.style.transform = 'scale(1)';
+            carImageElement.classList.add('fill-container'); // Fill container, crop if needed
+            updateStrikeCounter();
+            updateGuessHistory();
         } else {
             guessesLeft--;
-            revealMoreOfCar();
+            zoomOutImage();
+            updateStrikeCounter();
+            updateGuessHistory();
+            
             if (guessesLeft === 0) {
-                feedback.textContent = `Game over! The correct car was ${currentCar}.`;
+                feedback.textContent = `Game over! The correct car was ${currentBrand} ${currentModel}.`;
                 userGuess.disabled = true;
                 guessButton.disabled = true;
                 nextButton.style.display = 'block';
-                overlays.forEach(overlay => overlay.style.display = 'none'); // Reveal the whole image
+                carImageElement.style.transform = 'scale(1)';
+                carImageElement.classList.add('fill-container'); // Fill container, crop if needed
             } else {
-                feedback.textContent = `Wrong, try again! You have ${guessesLeft} guesses left.`;
+                if (brandCorrect && !modelCorrect) {
+                    feedback.textContent = `⚠️ Brand correct, but wrong model! ${guessesLeft} guesses left.`;
+                } else if (!brandCorrect && modelCorrect) {
+                    feedback.textContent = `⚠️ Model correct, but wrong brand! ${guessesLeft} guesses left.`;
+                } else {
+                    feedback.textContent = `❌ Wrong! You have ${guessesLeft} guesses left.`;
+                }
             }
         }
+        
+        userGuess.value = '';
     });
 
     userGuess.addEventListener('keypress', function (event) {
